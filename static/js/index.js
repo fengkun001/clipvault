@@ -13,6 +13,35 @@ function authFetch(url, options = {}) {
   return fetch(url, Object.assign({}, options, { headers }));
 }
 
+/* fetch 不支持上传进度，大文件用 XHR 并驱动进度条 */
+function uploadWithProgress(url, formData) {
+  const progress = document.getElementById("uploadProgress");
+  const bar = document.getElementById("uploadBar");
+  progress.hidden = false;
+  bar.style.width = "0%";
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", "Bearer " + token);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+    });
+    xhr.addEventListener("load", () => {
+      progress.hidden = true;
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch (e) { /* 非 JSON 响应 */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(new Error(body.detail || "上传失败（HTTP " + xhr.status + "）"));
+    });
+    xhr.addEventListener("error", () => { progress.hidden = true; reject(new Error("网络错误，上传失败")); });
+    xhr.addEventListener("abort", () => { progress.hidden = true; reject(new Error("上传已取消")); });
+    xhr.send(formData);
+  });
+}
+
 function refreshAuthUI() {
   const token = getToken();
   const authModal = document.getElementById("authModal");
@@ -153,17 +182,56 @@ document.getElementById("e2eToggle").addEventListener("change", (e) => {
   document.getElementById("e2eNote").hidden = e.target.value !== "on";
 });
 
+/* ---------- 自定义有效期 / 访问次数 ---------- */
+document.getElementById("expiry").addEventListener("change", (e) => {
+  document.getElementById("expiryCustom").hidden = e.target.value !== "custom";
+});
+document.getElementById("maxViews").addEventListener("change", (e) => {
+  document.getElementById("viewsCustom").hidden = e.target.value !== "custom";
+});
+
+const MAX_EXPIRY_SECONDS = 365 * 86400; // 与服务端上限一致
+
 /* ---------- 创建分享 ---------- */
 function readOptions() {
   const expiryVal = document.getElementById("expiry").value;
-  const expires_in = expiryVal === "forever" ? null : parseInt(expiryVal, 10);
+  let expires_in;
+  if (expiryVal === "forever") {
+    expires_in = null;
+  } else if (expiryVal === "custom") {
+    const n = parseInt(document.getElementById("expiryValue").value, 10);
+    const unit = parseInt(document.getElementById("expiryUnit").value, 10);
+    if (!Number.isInteger(n) || n < 1) throw new Error("自定义有效期请输入正整数");
+    expires_in = n * unit;
+    if (expires_in > MAX_EXPIRY_SECONDS) throw new Error("自定义有效期最长 365 天");
+  } else {
+    expires_in = parseInt(expiryVal, 10);
+  }
+
   const viewsVal = document.getElementById("maxViews").value;
-  const max_views = viewsVal === "unlimited" ? null : parseInt(viewsVal, 10);
+  let max_views;
+  if (viewsVal === "unlimited") {
+    max_views = null;
+  } else if (viewsVal === "custom") {
+    const n = parseInt(document.getElementById("viewsValue").value, 10);
+    if (!Number.isInteger(n) || n < 1 || n > 100000) {
+      throw new Error("自定义访问次数范围为 1-100000");
+    }
+    max_views = n;
+  } else {
+    max_views = parseInt(viewsVal, 10);
+  }
   return { expires_in, max_views };
 }
 
 async function createShare() {
-  const { expires_in, max_views } = readOptions();
+  let expires_in, max_views;
+  try {
+    ({ expires_in, max_views } = readOptions());
+  } catch (e) {
+    showToast(e.message);
+    return;
+  }
   const btn = document.getElementById("shareBtn");
   btn.disabled = true;
   btn.textContent = "创建中…";
@@ -177,9 +245,7 @@ async function createShare() {
       fd.append("file", selectedFile);
       if (expires_in !== null) fd.append("expires_in", expires_in);
       if (max_views !== null) fd.append("max_views", max_views);
-      const res = await authFetch("/api/files", { method: "POST", body: fd });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "上传失败");
-      data = await res.json();
+      data = await uploadWithProgress("/api/files", fd);
       addHistory({
         code: data.code, url: data.url, delete_token: data.delete_token,
         preview: `📎 ${selectedFile.name}`, created_at: new Date().toISOString(),

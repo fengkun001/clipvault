@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import settings
 from .database import Base, engine, SessionLocal
+from .ratelimit import RateLimitMiddleware
 from .routers import share, files, auth
 from .services import burn_share
 
@@ -68,9 +69,11 @@ def _migrate(engine) -> None:
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.middleware("http")
@@ -81,7 +84,8 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+        "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
+        "style-src 'self' 'unsafe-inline'; "
         "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     )
     return response

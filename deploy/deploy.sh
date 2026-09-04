@@ -30,7 +30,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/clipvault
 Environment=BASE_URL=http://${SERVER_IP}
-ExecStart=/opt/clipvault/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/opt/clipvault/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers
 Restart=always
 RestartSec=3
 

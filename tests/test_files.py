@@ -1,11 +1,12 @@
 """文件分享 API 集成测试"""
 import io
 import json
+import os
 import time
 import urllib.request
 import uuid
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.environ.get("BASE", "http://127.0.0.1:8000")
 BOUNDARY = "----ClipVaultTest" + uuid.uuid4().hex[:8]
 
 

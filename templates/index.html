@@ -53,6 +53,7 @@
           </div>
           <button class="btn btn-danger" id="fsRemove" title="移除">✕</button>
         </div>
+        <div class="upload-progress" id="uploadProgress" hidden><div class="bar" id="uploadBar"></div></div>
       </div>
 
       <div class="options">
@@ -72,7 +73,16 @@
             <option value="86400" selected>24 小时</option>
             <option value="604800">7 天</option>
             <option value="forever">永久</option>
+            <option value="custom">自定义…</option>
           </select>
+          <span class="custom-opt" id="expiryCustom" hidden>
+            <input type="number" id="expiryValue" min="1" max="3650" value="3" inputmode="numeric">
+            <select id="expiryUnit">
+              <option value="60">分钟</option>
+              <option value="3600" selected>小时</option>
+              <option value="86400">天</option>
+            </select>
+          </span>
         </div>
         <div class="opt-group">
           <label for="maxViews">访问次数</label>
@@ -80,7 +90,12 @@
             <option value="1">1 次（阅后即焚）</option>
             <option value="5">5 次</option>
             <option value="unlimited" selected>无限制</option>
+            <option value="custom">自定义…</option>
           </select>
+          <span class="custom-opt" id="viewsCustom" hidden>
+            <input type="number" id="viewsValue" min="1" max="100000" value="20" inputmode="numeric">
+            <span class="unit">次</span>
+          </span>
         </div>
         <div class="opt-group" id="e2eGroup">
           <label for="e2eToggle">隐私加密</label>

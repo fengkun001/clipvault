@@ -98,6 +98,10 @@ async function render(data) {
 }
 
 /* ---------- 文件类渲染 ---------- */
+const PREVIEWABLE_IMAGE = /^image\/(png|jpe?g|gif|webp|bmp|svg\+xml)$/i;
+const PREVIEWABLE_MEDIA = /^video\/(mp4|webm)|^audio\/(mpeg|mp3|wav|ogg|m4a)/i;
+const PREVIEW_SIZE_LIMIT = 50 * 1024 * 1024; // 超过 50MB 不做在线预览
+
 function renderFile(meta) {
   document.getElementById("loadingBox").hidden = true;
   const box = document.getElementById("fileBox");
@@ -107,16 +111,64 @@ function renderFile(meta) {
   const icon = document.getElementById("fileIcon");
   icon.textContent = fileIconFor(ext);
 
-  document.getElementById("fileName").textContent = meta.file_name || "未命名文件";
+  const fileName = meta.file_name || "未命名文件";
+  document.getElementById("fileName").textContent = fileName;
   document.getElementById("fileSize").textContent = formatBytes(meta.file_size);
   updateViewsBadge(document.getElementById("fileViewsBadge"), meta.view_count, meta.max_views);
   startExpiryBadge(document.getElementById("fileExpiryBadge"), meta.expires_at);
 
-  document.getElementById("downloadBtn").addEventListener("click", () => {
-    window.location.href = `/api/files/${encodeURIComponent(code)}/download`;
-    showToast("下载已开始，页面稍后刷新");
-    setTimeout(() => location.reload(), 3000);
-  });
+  const downloadUrl = `/api/files/${encodeURIComponent(code)}/download`;
+  const mime = meta.file_mime || "";
+  const previewable =
+    (PREVIEWABLE_IMAGE.test(mime) || PREVIEWABLE_MEDIA.test(mime)) &&
+    (meta.file_size || 0) <= PREVIEW_SIZE_LIMIT;
+
+  if (!previewable) {
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      window.location.href = downloadUrl;
+      showToast("下载已开始，页面稍后刷新");
+      setTimeout(() => location.reload(), 3000);
+    });
+    return;
+  }
+
+  /* 可预览文件：只请求一次（消耗一次访问），blob 同时用于在线预览与下载，
+     避免"预览算一次、下载又算一次"的双倍计数 */
+  const previewBox = document.getElementById("filePreview");
+  const dlBtn = document.getElementById("downloadBtn");
+  dlBtn.disabled = true;
+
+  fetch(downloadUrl)
+    .then(async (res) => {
+      if (res.status === 404 || res.status === 410) { showBurned(res.status); return null; }
+      if (!res.ok) throw new Error();
+      return res.blob();
+    })
+    .then((blob) => {
+      if (!blob) return;
+      const objUrl = URL.createObjectURL(blob);
+      const media = document.createElement(PREVIEWABLE_IMAGE.test(mime) ? "img" : "video");
+      media.src = objUrl;
+      if (media.tagName === "VIDEO") { media.controls = true; }
+      previewBox.appendChild(media);
+      previewBox.hidden = false;
+      // 预览本身消耗了一次访问，徽章同步 +1
+      updateViewsBadge(document.getElementById("fileViewsBadge"), meta.view_count + 1, meta.max_views);
+
+      dlBtn.disabled = false;
+      dlBtn.addEventListener("click", () => {
+        const a = document.createElement("a");
+        a.href = objUrl;
+        a.download = fileName;
+        a.click();
+        showToast("已保存（不额外消耗访问次数）");
+      });
+    })
+    .catch(() => {
+      dlBtn.disabled = false;
+      dlBtn.addEventListener("click", () => { window.location.href = downloadUrl; });
+      showToast("预览加载失败，可点击下载查看");
+    });
 }
 
 function fileIconFor(ext) {

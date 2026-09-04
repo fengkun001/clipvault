@@ -20,6 +20,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* hidden 属性兜底：防止 display:flex 等覆盖 [hidden] */
+[hidden] { display: none !important; }
+
 html { color-scheme: dark; }
 
 body {
@@ -328,3 +331,24 @@ footer a:hover { color: var(--accent); }
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 自定义有效期 / 访问次数输入 */
+.custom-opt { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.custom-opt input[type="number"] {
+  width: 90px;
+  background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 10px; font-size: 14px; outline: none;
+  transition: border-color 0.2s;
+}
+.custom-opt input[type="number"]:focus { border-color: var(--accent); }
+.custom-opt select { flex: 1; }
+.custom-opt .unit { font-size: 13px; color: var(--text-dim); }
+
+/* 文件上传进度条 */
+.upload-progress { margin-top: 10px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.upload-progress .bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.15s; }
+
+/* 图片在线预览 */
+.file-preview { text-align: center; padding: 16px; }
+.file-preview img, .file-preview video { max-width: 100%; max-height: 60vh; border-radius: var(--radius-sm); }
