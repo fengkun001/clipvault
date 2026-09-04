@@ -1,0 +1,16 @@
+[Unit]
+Description=ClipVault cloud clipboard service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/clipvault
+Environment=BASE_URL=http://YOUR_SERVER_IP
+ExecStart=/opt/clipvault/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

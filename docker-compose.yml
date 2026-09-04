@@ -1,0 +1,14 @@
+services:
+  clipvault:
+    build: .
+    container_name: clipvault
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - BASE_URL=${BASE_URL:-http://localhost:8000}
+      - DATABASE_URL=sqlite:////data/clipvault.db
+      - JWT_SECRET=${JWT_SECRET:-}
+    volumes:
+      - ./data/uploads:/app/uploads   # 分享文件持久化
+      - ./data/db:/data              # 数据库持久化
