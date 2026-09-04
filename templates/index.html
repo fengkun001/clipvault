@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ClipVault - 轻量级云剪切板分享系统，支持有效期、访问次数限制、阅后即焚">
+  <title>ClipVault · 云剪切板分享</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a class="brand" href="/">
+        <span class="logo">📋</span>
+        <span class="name">ClipVault</span>
+      </a>
+      <div class="nav-right">
+        <span class="tag" id="userBadge" hidden>👤 <b id="userName"></b></span>
+        <button class="btn btn-ghost" id="loginBtn">登录 / 注册</button>
+        <button class="btn btn-ghost" id="logoutBtn" hidden>退出</button>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <h1>跨设备，<span>一秒同步</span>你的剪切板</h1>
+      <p>粘贴文本，生成链接与二维码 —— 手机扫码即取，支持 Markdown 与代码高亮</p>
+    </header>
+
+    <!-- 编辑区 -->
+    <section class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="text">📝 文本</button>
+        <button class="tab" data-tab="file">📎 文件</button>
+      </div>
+
+      <div id="textTab">
+        <textarea id="content" placeholder="在这里粘贴要分享的文本、链接、代码或 Markdown…" spellcheck="false"></textarea>
+      </div>
+
+      <div id="fileTab" hidden>
+        <input type="file" id="fileInput" hidden>
+        <div class="dropzone" id="dropzone" role="button" tabindex="0">
+          <div class="dz-icon">📎</div>
+          <p class="dz-text">点击选择，或将文件拖拽到此处</p>
+          <p class="dz-hint">单个文件最大 100MB · 支持任意类型 · 服务端自动隔离存储</p>
+        </div>
+        <div class="file-selected" id="fileSelected" hidden>
+          <span class="fs-icon" id="fsIcon">📄</span>
+          <div class="fs-info">
+            <div class="fs-name" id="fsName">—</div>
+            <div class="fs-size" id="fsSize">—</div>
+          </div>
+          <button class="btn btn-danger" id="fsRemove" title="移除">✕</button>
+        </div>
+      </div>
+
+      <div class="options">
+        <div class="opt-group" id="typeGroup">
+          <label for="contentType">内容类型</label>
+          <select id="contentType">
+            <option value="auto" selected>🪄 自动识别</option>
+            <option value="text">📄 纯文本</option>
+            <option value="markdown">📝 Markdown</option>
+            <option value="code">💻 代码</option>
+          </select>
+        </div>
+        <div class="opt-group">
+          <label for="expiry">有效期</label>
+          <select id="expiry">
+            <option value="3600">1 小时</option>
+            <option value="86400" selected>24 小时</option>
+            <option value="604800">7 天</option>
+            <option value="forever">永久</option>
+          </select>
+        </div>
+        <div class="opt-group">
+          <label for="maxViews">访问次数</label>
+          <select id="maxViews">
+            <option value="1">1 次（阅后即焚）</option>
+            <option value="5">5 次</option>
+            <option value="unlimited" selected>无限制</option>
+          </select>
+        </div>
+        <div class="opt-group" id="e2eGroup">
+          <label for="e2eToggle">隐私加密</label>
+          <select id="e2eToggle">
+            <option value="off">关闭</option>
+            <option value="on">🔐 端到端加密</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="shareBtn">⚡ 生成分享链接</button>
+      <p class="e2e-note" id="e2eNote" hidden>🔐 端到端加密已开启：内容在浏览器内用 AES-256-GCM 加密，密钥仅存于链接的 # 锚点中（不会发送到服务器），服务器上只有密文。</p>
+    </section>
+
+    <!-- 分享结果 -->
+    <section class="card" id="resultCard" hidden>
+      <div class="result-head">
+        <span class="dot"></span>
+        <h2>分享已创建</h2>
+      </div>
+      <div class="link-box">
+        <code id="shareLink"></code>
+        <button class="btn btn-copy" id="copyBtn">复制</button>
+      </div>
+      <div class="result-body">
+        <div class="qr-wrap">
+          <div id="qrcode"></div>
+        </div>
+        <div class="result-meta">
+          <div class="meta-row"><span>有效期至</span><b id="metaExpiry">—</b></div>
+          <div class="meta-row"><span>剩余访问次数</span><b id="metaViews">—</b></div>
+          <div class="meta-row"><span>手机扫码</span><b>直接打开</b></div>
+          <p class="burn-note">🔒 销毁令牌已保存在本设备（localStorage），可在下方「我的分享」中手动焚毁；到达访问上限后服务器将立即物理删除内容。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 我的分享 -->
+    <section>
+      <div class="section-title" id="myShareTitle">🗂️ 我的分享 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">（仅本设备可见）</span></div>
+      <div class="card" id="historyCard">
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <!-- 登录弹窗 -->
+    <div class="modal-mask" id="authModal" hidden>
+      <div class="modal">
+        <h3>登录 ClipVault</h3>
+        <p class="modal-sub">登录后可在云端管理你的分享；匿名分享功能不受任何影响</p>
+        <div class="form-group">
+          <label>用户名</label>
+          <input id="authUsername" placeholder="3-32 位字母/数字/下划线/中文" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input id="authPassword" type="password" placeholder="至少 6 位" autocomplete="current-password">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="doLoginBtn" style="width:auto">登录</button>
+          <button class="btn btn-ghost" id="doRegisterBtn">注册新账号</button>
+        </div>
+        <p class="auth-hint">🔒 密码经 PBKDF2-SHA256（26 万轮迭代）哈希后存储，服务器不保存明文</p>
+        <button class="modal-close" id="authClose">✕</button>
+      </div>
+    </div>
+
+    <footer>
+      ClipVault · 云剪切板分享系统 · 匿名分享，阅后即焚<br>
+      <a href="/docs" target="_blank">API 文档</a> · FastAPI + SQLite
+    </footer>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/static/lib/qrcode.min.js"></script>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/index.js"></script>
+</body>
+</html>

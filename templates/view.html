@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分享内容 · ClipVault</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/lib/highlight-theme.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a class="brand" href="/">
+        <span class="logo">📋</span>
+        <span class="name">ClipVault</span>
+      </a>
+      <span class="tag" id="codeTag">…</span>
+    </nav>
+
+    <!-- 加载中 -->
+    <div class="card loading" id="loadingBox">
+      <div class="spinner"></div>
+      <span>正在取回内容…</span>
+    </div>
+
+    <!-- 已失效 -->
+    <div class="card status-card" id="burnedBox" hidden>
+      <div class="icon">🔥</div>
+      <h2 id="burnedTitle">内容已焚毁</h2>
+      <p id="burnedDesc">该分享不存在、已过期或达到访问次数上限。</p>
+      <a class="btn btn-ghost" href="/">返回首页创建新分享</a>
+    </div>
+
+    <!-- 文本 / 代码 / Markdown -->
+    <div class="card" id="contentBox" hidden style="padding:0; overflow:hidden;">
+      <div class="view-toolbar">
+        <span class="badge badge-blue" id="typeBadge">文本</span>
+        <span class="badge" id="viewsBadge">访问 -/-</span>
+        <span class="badge" id="expiryBadge">⏳ —</span>
+        <span class="spacer"></span>
+        <button class="btn btn-copy" id="copyBtn">复制内容</button>
+      </div>
+      <div class="content-area">
+        <pre id="textContent" hidden></pre>
+        <div class="md-body" id="mdContent" hidden></div>
+        <pre hidden><code id="codeContent" class="hljs"></code></pre>
+      </div>
+    </div>
+
+    <!-- 文件分享 -->
+    <div class="card" id="fileBox" hidden style="padding:0; overflow:hidden;">
+      <div class="view-toolbar">
+        <span class="badge badge-blue">📦 文件</span>
+        <span class="badge" id="fileViewsBadge">访问 -/-</span>
+        <span class="badge" id="fileExpiryBadge">⏳ —</span>
+        <span class="spacer"></span>
+        <button class="btn btn-copy" id="downloadBtn">⬇ 下载文件</button>
+      </div>
+      <div class="content-area">
+        <div class="file-box">
+          <span class="icon" id="fileIcon">📄</span>
+          <div style="flex:1">
+            <div class="fname" id="fileName">—</div>
+            <div class="fsize" id="fileSize">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      ClipVault · 匿名分享，阅后即焚 · <a href="/">创建新分享</a>
+    </footer>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/static/lib/marked.min.js"></script>
+  <script src="/static/lib/purify.min.js"></script>
+  <script src="/static/lib/highlight.min.js"></script>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/view.js"></script>
+</body>
+</html>
