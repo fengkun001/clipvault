@@ -7,10 +7,9 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/clipvault
-Environment=BASE_URL=http://YOUR_SERVER_IP:3000
-# 直连模式绑定 0.0.0.0:3000；不加 --proxy-headers（无反代时客户端 IP 即真实 IP，
-# 信任 X-Forwarded-For 会让伪造头绕过限流）
-ExecStart=/opt/clipvault/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 3000 --workers 2
+Environment=BASE_URL=http://YOUR_SERVER_IP
+# Nginx 反代模式：只监听本机回环，--proxy-headers 信任 Nginx 传入的 X-Forwarded-For 取真实 IP
+ExecStart=/opt/clipvault/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers
 Restart=always
 RestartSec=3
 
