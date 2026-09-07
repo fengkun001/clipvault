@@ -35,7 +35,8 @@ cp deploy/nginx.conf /etc/nginx/sites-available/clipvault
 ln -sf /etc/nginx/sites-available/clipvault /etc/nginx/sites-enabled/clipvault
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
-systemctl reload nginx
+# 用 restart 而非 reload：确保运行中的配置与磁盘一致，避免"改了配置没生效"
+systemctl restart nginx
 
 echo "==> 5/5 防火墙放行 80 端口"
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
