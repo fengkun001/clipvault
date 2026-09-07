@@ -313,6 +313,23 @@ function showResult(data) {
   document.getElementById("metaViews").textContent = data.max_views ?? "无限制";
 }
 
+/* ---------- 事件委托：处理"我的分享"中的按钮点击 ---------- */
+document.getElementById("historyList").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const code = btn.dataset.code;
+  if (!code) return;
+  if (btn.dataset.action === "destroy") {
+    destroyMyShare(code);
+  } else if (btn.dataset.action === "copy") {
+    copyMyUrl(code);
+  } else if (btn.dataset.action === "destroy-local") {
+    destroyShare(code);
+  } else if (btn.dataset.action === "copy-local") {
+    copyHistoryUrl(code);
+  }
+});
+
 /* ---------- 销毁与历史渲染 ---------- */
 async function destroyShare(code) {
   const list = getHistory();
@@ -367,8 +384,8 @@ async function renderMyShares() {
             <span class="desc">${escapeHtml(s.preview || "")} · ${views} · ${exp}</span>
           </div>
           <div class="actions">
-            <button class="btn btn-ghost" onclick="copyMyUrl('${s.code}')">复制链接</button>
-            <button class="btn btn-danger" onclick="destroyMyShare('${s.code}')">🔥 焚毁</button>
+            <button class="btn btn-ghost" data-action="copy" data-code="${s.code}">复制链接</button>
+            <button class="btn btn-danger" data-action="destroy" data-code="${s.code}">🔥 焚毁</button>
           </div>
         </div>`;
     }).join("");
@@ -408,8 +425,8 @@ function renderHistory() {
           <span class="desc">${escapeHtml(item.preview || "")}${status}</span>
         </div>
         <div class="actions">
-          <button class="btn btn-ghost" onclick="copyHistoryUrl('${item.code}')">复制链接</button>
-          <button class="btn btn-danger" onclick="destroyShare('${item.code}')">🔥 焚毁</button>
+          <button class="btn btn-ghost" data-action="copy-local" data-code="${item.code}">复制链接</button>
+          <button class="btn btn-danger" data-action="destroy-local" data-code="${item.code}">🔥 焚毁</button>
         </div>
       </div>`;
   }).join("");

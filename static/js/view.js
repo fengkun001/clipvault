@@ -55,7 +55,7 @@ async function render(data) {
       return;
     }
     if (!hasCrypto()) {
-      showToast("当前环境不支持解密（需 HTTPS 或 localhost）");
+      showToast("当前浏览器不支持解密（请使用 HTTPS 或现代浏览器打开）");
       return;
     }
     try {

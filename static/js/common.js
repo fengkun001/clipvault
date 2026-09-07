@@ -71,12 +71,14 @@ function formatRemaining(expiresAt) {
 }
 
 /* ============ 端到端加密（E2E）=============
- * 客户端生成 AES-256-GCM 密钥并加密明文，
+ * 优先使用 Web Crypto API（AES-256-GCM，需 HTTPS/localhost），
+ * 不可用时自动降级为纯 JS 实现（AES-256-CBC + HMAC-SHA256）。
+ * 
  * 服务器只存密文；密钥放 URL 锚点（# 后部分不会随请求发送），
  * 因此服务器永远无法解密内容。
  * ================================================= */
 function hasCrypto() {
-  return typeof crypto !== "undefined" && crypto.subtle;
+  return (typeof crypto !== "undefined" && crypto.subtle) || typeof E2E_FALLBACK !== "undefined";
 }
 
 function bytesToBase64(bytes) {
@@ -93,24 +95,45 @@ function base64ToBytes(b64) {
 }
 
 async function e2eEncrypt(plaintext) {
-  const key = await crypto.subtle.generateKey(
-    { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-  );
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext)
-  );
-  const rawKey = await crypto.subtle.exportKey("raw", key);
-  return {
-    payload: bytesToBase64(iv) + "." + bytesToBase64(new Uint8Array(ct)),
-    keyB64: bytesToBase64(new Uint8Array(rawKey)),
-  };
+  // 优先使用 Web Crypto API（原生 AES-256-GCM，性能更好）
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const key = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext)
+    );
+    const rawKey = await crypto.subtle.exportKey("raw", key);
+    return {
+      payload: bytesToBase64(iv) + "." + bytesToBase64(new Uint8Array(ct)),
+      keyB64: bytesToBase64(new Uint8Array(rawKey)),
+    };
+  }
+
+  // 降级：纯 JS AES-256-CBC + HMAC-SHA256（HTTP 环境）
+  if (typeof E2E_FALLBACK !== "undefined") {
+    return await E2E_FALLBACK.encrypt(plaintext);
+  }
+
+  throw new Error("当前环境不支持加密");
 }
 
 async function e2eDecrypt(payload, keyB64) {
-  const [ivB64, ctB64] = payload.split(".");
-  if (!ivB64 || !ctB64) throw new Error("bad payload");
-  const key = await crypto.subtle.importKey("raw", base64ToBytes(keyB64), { name: "AES-GCM" }, false, ["decrypt"]);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(ivB64) }, key, base64ToBytes(ctB64));
-  return new TextDecoder().decode(pt);
+  const parts = payload.split(".");
+
+  // GCM 格式（iv.ct，2 段）— 需 Web Crypto API
+  if (parts.length === 2 && typeof crypto !== "undefined" && crypto.subtle) {
+    const [ivB64, ctB64] = parts;
+    const key = await crypto.subtle.importKey("raw", base64ToBytes(keyB64), { name: "AES-GCM" }, false, ["decrypt"]);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(ivB64) }, key, base64ToBytes(ctB64));
+    return new TextDecoder().decode(pt);
+  }
+
+  // CBC+HMAC 格式（iv.ct.mac，3 段）— 纯 JS 实现
+  if (parts.length === 3 && typeof E2E_FALLBACK !== "undefined") {
+    return await E2E_FALLBACK.decrypt(payload, keyB64);
+  }
+
+  throw new Error("当前环境不支持解密（需 HTTPS 或现代浏览器）");
 }

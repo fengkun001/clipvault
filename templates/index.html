@@ -107,7 +107,7 @@
       </div>
 
       <button class="btn btn-primary" id="shareBtn">⚡ 生成分享链接</button>
-      <p class="e2e-note" id="e2eNote" hidden>🔐 端到端加密已开启：内容在浏览器内用 AES-256-GCM 加密，密钥仅存于链接的 # 锚点中（不会发送到服务器），服务器上只有密文。</p>
+      <p class="e2e-note" id="e2eNote" hidden>🔐 端到端加密已开启：内容在浏览器内加密（AES-256-GCM / AES-256-CBC+HMAC），密钥仅存于链接的 # 锚点中（不会发送到服务器），服务器上只有密文。</p>
     </section>
 
     <!-- 分享结果 -->
@@ -171,6 +171,7 @@
 
   <div id="toast"></div>
   <script src="/static/lib/qrcode.min.js"></script>
+  <script src="/static/lib/e2e-fallback.js"></script>
   <script src="/static/js/common.js"></script>
   <script src="/static/js/index.js"></script>
 </body>
