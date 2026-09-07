@@ -27,6 +27,9 @@ sed "s|YOUR_SERVER_IP|${SERVER_IP}|" deploy/clipvault.service > /etc/systemd/sys
 mkdir -p /opt/clipvault/uploads
 chown -R www-data:www-data /opt/clipvault
 systemctl daemon-reload
+# 清理可能残留的占端进程（如手动启动过的 uvicorn）：SO_REUSEPORT 会让新旧进程
+# 共享 8000 端口，内核随机分发连接，旧代码会导致时好时坏的灵异故障
+fuser -k 8000/tcp 2>/dev/null || true
 systemctl enable clipvault
 systemctl restart clipvault
 
