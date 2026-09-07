@@ -1,0 +1,233 @@
+# ClipVault 部署手册
+
+## 一、环境要求
+
+| 组件 | 版本/要求 |
+|------|-----------|
+| 操作系统 | Ubuntu 22.04 LTS（推荐）或任何支持 Python 3.10+ 的 Linux |
+| Python | 3.10+ |
+| Nginx | 1.18+ |
+| 内存 | 最低 512MB，推荐 1GB+ |
+| 磁盘 | 最低 1GB（取决于上传文件量） |
+| 端口 | 80（HTTP）需在安全组/防火墙放行 |
+
+---
+
+## 二、快速部署（服务器）
+
+项目提供一键部署脚本，适用于 Ubuntu 22.04。
+
+### 2.1 获取代码
+
+```bash
+git clone https://github.com/fengkun001/clipvault.git
+cd clipvault
+```
+
+### 2.2 一键部署
+
+```bash
+# 可选：国内服务器使用阿里云 pip 镜像加速
+export PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
+sudo bash deploy/deploy.sh 39.107.52.250
+```
+
+> 将 `39.107.52.250` 替换为你的服务器公网 IP。
+
+### 2.3 脚本做了什么
+
+| 步骤 | 操作 |
+|------|------|
+| 1/5 | 安装系统依赖：python3, python3-venv, python3-pip, nginx |
+| 2/5 | 同步代码到 `/opt/clipvault`，创建虚拟环境，安装 Python 依赖 |
+| 3/5 | 配置 systemd 服务（clipvault.service），开机自启，崩溃重启 |
+| 4/5 | 配置 Nginx 反向代理（80 → 127.0.0.1:8000），移除默认站点 |
+| 5/5 | 检查 ufw 防火墙，放行 80 端口 |
+
+### 2.4 验证部署
+
+```bash
+# 健康检查
+curl http://127.0.0.1/api/health
+
+# 外网访问
+curl http://39.107.52.250/api/health
+
+# 服务状态
+systemctl status clipvault --no-pager
+
+# 查看日志
+journalctl -u clipvault -f
+```
+
+---
+
+## 三、本地开发
+
+### 3.1 安装依赖
+
+```bash
+cd clipvault
+python3 -m venv venv
+source venv/bin/activate    # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 3.2 启动开发服务器
+
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+访问 `http://127.0.0.1:8000` 即可使用。
+
+### 3.3 项目结构
+
+```
+clipvault/
+├── app/
+│   ├── main.py          # FastAPI 应用入口
+│   ├── config.py        # 配置管理
+│   ├── database.py      # 数据库连接
+│   ├── models.py        # ORM 模型
+│   ├── schemas.py       # Pydantic 请求/响应模型
+│   ├── auth.py          # 认证（PBKDF2 + JWT）
+│   ├── security.py      # 短码生成、有效期常量
+│   ├── ratelimit.py     # 滑动窗口限流中间件
+│   ├── services.py      # 业务逻辑（阅后即焚等）
+│   └── routers/
+│       ├── share.py     # 文本分享 API
+│       ├── files.py     # 文件分享 API
+│       └── auth.py      # 用户系统 API
+├── templates/
+│   ├── index.html       # 首页
+│   └── view.html        # 查看页
+├── static/
+│   ├── css/style.css
+│   ├── js/
+│   │   ├── common.js    # 公共工具函数
+│   │   ├── index.js     # 首页逻辑
+│   │   └── view.js      # 查看页逻辑
+│   └── lib/             # 第三方库（highlight.js, marked, DOMPurify, QRCode）
+├── deploy/
+│   ├── deploy.sh        # 一键部署脚本
+│   ├── nginx.conf       # Nginx 配置模板
+│   └── clipvault.service # systemd 服务模板
+├── docs/                # 项目文档
+├── requirements.txt
+└── uploads/             # 上传文件存储目录（自动创建）
+```
+
+---
+
+## 四、环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `DATABASE_URL` | `sqlite:///clipvault.db` | 数据库连接字符串 |
+| `BASE_URL` | 空（自动检测） | 公网访问地址，如 `http://39.107.52.250` |
+| `JWT_SECRET` | 自动生成并持久化 | JWT 签名密钥 |
+| `PIP_INDEX_URL` | PyPI 官方源 | pip 镜像源（国内建议设阿里云镜像） |
+
+---
+
+## 五、日常运维
+
+### 5.1 重启服务
+
+```bash
+systemctl restart clipvault
+```
+
+### 5.2 查看日志
+
+```bash
+# 实时日志
+journalctl -u clipvault -f
+
+# 最近 50 行
+journalctl -u clipvault -n 50 --no-pager
+```
+
+### 5.3 更新部署
+
+修改代码后，重新执行一键部署脚本即可。脚本会自动：
+- 同步新代码（排除 uploads/ 和数据库文件，线上数据不丢失）
+- 更新 Python 依赖
+- 重启服务
+
+```bash
+cd ~/clipvault-src/clipvault
+git pull
+sudo bash deploy/deploy.sh 39.107.52.250
+```
+
+### 5.4 备份
+
+```bash
+# 备份数据库
+cp /opt/clipvault/clipvault.db ~/backup/clipvault-$(date +%Y%m%d).db
+
+# 备份上传文件
+tar -czf ~/backup/uploads-$(date +%Y%m%d).tar.gz /opt/clipvault/uploads/
+```
+
+### 5.5 数据库迁移
+
+SQLite → PostgreSQL 迁移示例：
+
+```bash
+# 1. 修改环境变量
+export DATABASE_URL="postgresql://user:pass@localhost/clipvault"
+
+# 2. 重启服务（SQLAlchemy 会自动建表）
+systemctl restart clipvault
+
+# 3. 数据迁移（可选，使用 pgloader 或自定义脚本）
+```
+
+---
+
+## 六、HTTPS 配置（可选）
+
+如果有域名，建议配置 Let's Encrypt 免费证书：
+
+```bash
+# 安装 certbot
+apt-get install -y certbot python3-certbot-nginx
+
+# 获取证书并自动配置 Nginx
+certbot --nginx -d your-domain.com
+
+# 证书自动续期（已内置）
+certbot renew --dry-run
+```
+
+配置 HTTPS 后，端到端加密功能（基于 `crypto.subtle` API）即可启用。
+
+---
+
+## 七、常见问题
+
+### Q: 上传文件报 413
+
+A: 文件超过 100MB 限制。如需调整，修改 `config.py` 中的 `MAX_FILE_SIZE` 和 `nginx.conf` 中的 `client_max_body_size`。
+
+### Q: 服务启动失败
+
+```bash
+journalctl -u clipvault -n 50 --no-pager
+```
+
+常见原因：端口被占用（`fuser -k 8000/tcp`）、Python 依赖缺失（重新 `pip install -r requirements.txt`）。
+
+### Q: 外网无法访问
+
+1. 检查安全组是否放行 80 端口
+2. 检查 `systemctl status clipvault` 和 `systemctl status nginx`
+3. 检查 `ss -tlnp | grep 80` 确认 Nginx 在监听
+
+### Q: 部署后数据库或文件丢失
+
+A: 部署脚本使用 `rsync --exclude uploads --exclude '*.db'`，不会覆盖线上数据。如果确实丢失，检查 `/opt/clipvault/` 目录是否被手动删除过。
