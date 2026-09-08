@@ -449,13 +449,14 @@ function renderHistory() {
     return;
   }
   box.innerHTML = list.map((item) => {
-    const expired = item.expires_at && new Date(item.expires_at) < new Date();
-    const status = expired ? "（已过期）" : "";
+    const expText = item.expires_at
+      ? new Date(item.expires_at).toLocaleString("zh-CN")
+      : "永久";
     return `
       <div class="share-item">
         <div class="info">
           <a class="code-link" href="/s/${item.code}" target="_blank">/s/${item.code}</a>
-          <span class="desc">${escapeHtml(item.preview || "")}${status}</span>
+          <span class="desc">${escapeHtml(item.preview || "")} · 有效期至 ${expText}</span>
         </div>
         <div class="actions">
           <button class="btn btn-ghost" data-action="copy-local" data-code="${item.code}">复制链接</button>
