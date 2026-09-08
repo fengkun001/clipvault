@@ -352,3 +352,25 @@ footer a:hover { color: var(--accent); }
 /* 图片在线预览 */
 .file-preview { text-align: center; padding: 16px; }
 .file-preview img, .file-preview video { max-width: 100%; max-height: 60vh; border-radius: var(--radius-sm); }
+
+/* 已焚毁分享条目 */
+.share-item.burned { opacity: 0.6; }
+.share-item.burned .code-link { text-decoration: line-through; }
+.burned-tag {
+  font-size: 11px;
+  color: var(--danger);
+  font-weight: 600;
+  background: rgba(248, 81, 73, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* 选项提示文字 */
+.opt-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  line-height: 1.5;
+}

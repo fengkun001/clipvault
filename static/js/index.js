@@ -179,7 +179,9 @@ function addHistory(item) { const l = getHistory(); l.unshift(item); saveHistory
 
 /* ---------- 加密开关提示 ---------- */
 document.getElementById("e2eToggle").addEventListener("change", (e) => {
-  document.getElementById("e2eNote").hidden = e.target.value !== "on";
+  const on = e.target.value === "on";
+  document.getElementById("e2eNote").hidden = !on;
+  document.getElementById("e2eHint").hidden = !on;
 });
 
 /* ---------- 自定义有效期 / 访问次数 ---------- */
@@ -259,7 +261,7 @@ async function createShare() {
       let body, preview;
       const wantE2E = document.getElementById("e2eToggle").value === "on";
       if (wantE2E) {
-        if (!hasCrypto()) { showToast("当前环境不支持加密（需 HTTPS 或 localhost）"); return; }
+        if (!hasCrypto()) { showToast("当前浏览器不支持加密（请使用现代浏览器或 HTTPS 访问）"); return; }
         // 端到端加密：浏览器内完成，服务器只收到密文
         const enc = await e2eEncrypt(content);
         keyB64 = enc.keyB64;
@@ -373,15 +375,25 @@ async function renderMyShares() {
     }
     box.innerHTML = list.map((s) => {
       const expired = s.expires_at && new Date(s.expires_at) < new Date();
-      const views = s.max_views ? `👁 ${s.view_count}/${s.max_views}` : `👁 ${s.view_count}`;
+      const viewsExhausted = s.max_views && s.view_count >= s.max_views;
+      const burned = expired || viewsExhausted;
+
       const exp = s.expires_at
-        ? (expired ? "已过期" : new Date(s.expires_at).toLocaleString("zh-CN"))
+        ? (expired ? "⌛ 已过期" : new Date(s.expires_at).toLocaleString("zh-CN"))
         : "永久";
+      const views = s.max_views
+        ? `👁 ${s.view_count}/${s.max_views}${viewsExhausted ? " 🔥" : ""}`
+        : `👁 ${s.view_count}`;
+
+      const statusTag = burned
+        ? '<span class="burned-tag">🔥 已焚毁</span>'
+        : "";
+
       return `
-        <div class="share-item">
+        <div class="share-item${burned ? " burned" : ""}">
           <div class="info">
             <a class="code-link" href="/s/${s.code}" target="_blank">${TYPE_ICON[s.content_type] || "📄"} /s/${s.code}</a>
-            <span class="desc">${escapeHtml(s.preview || "")} · ${views} · ${exp}</span>
+            <span class="desc">${escapeHtml(s.preview || "")} · ${views} · ${exp} ${statusTag}</span>
           </div>
           <div class="actions">
             <button class="btn btn-ghost" data-action="copy" data-code="${s.code}">复制链接</button>
@@ -389,6 +401,27 @@ async function renderMyShares() {
           </div>
         </div>`;
     }).join("");
+
+    // 自动清理已焚毁的分享（异步检查每个链接是否真的已失效）
+    list.filter((s) => {
+      const expired = s.expires_at && new Date(s.expires_at) < new Date();
+      const viewsExhausted = s.max_views && s.view_count >= s.max_views;
+      return expired || viewsExhausted;
+    }).forEach((s) => {
+      // 验证：尝试访问 /meta，如果返回 410 则确实已焚毁
+      fetch(`/api/shares/${s.code}/meta`)
+        .then((r) => {
+          if (r.status === 410) {
+            // 从列表中移除该条目
+            const wrapper = document.querySelector(`.share-item [data-code="${s.code}"]`);
+            if (wrapper) {
+              const item = wrapper.closest(".share-item");
+              if (item) item.style.display = "none";
+            }
+          }
+        })
+        .catch(() => {});
+    });
   } catch (e) {
     box.innerHTML = '<div class="empty-tip">加载失败，请刷新重试</div>';
   }

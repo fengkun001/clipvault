@@ -17,7 +17,7 @@ templates = Jinja2Templates(directory=str(settings.BASE_DIR / "templates"))
 
 
 async def cleanup_expired():
-    """后台任务：定期物理删除过期分享与超过 30 天的访问日志"""
+    """后台任务：定期物理删除过期分享、次数用尽分享、超过 30 天的访问日志"""
     from .models import Share, AccessLog
 
     while True:
@@ -25,6 +25,9 @@ async def cleanup_expired():
         db = SessionLocal()
         try:
             now = datetime.utcnow()
+            deleted = 0
+
+            # 1. 时间过期
             expired = (
                 db.query(Share)
                 .filter(Share.expires_at.isnot(None), Share.expires_at < now)
@@ -32,13 +35,27 @@ async def cleanup_expired():
             )
             for s in expired:
                 burn_share(db, s)
+                deleted += 1
+
+            # 2. 访问次数用尽
+            exhausted = (
+                db.query(Share)
+                .filter(Share.max_views.isnot(None), Share.view_count >= Share.max_views)
+                .all()
+            )
+            for s in exhausted:
+                burn_share(db, s)
+                deleted += 1
+
+            # 3. 超过 30 天的访问日志
             db.query(AccessLog).filter(
                 AccessLog.accessed_at < now - timedelta(days=30)
             ).delete()
             db.commit()
-            if expired:
-                print(f"[cleanup] 已清理 {len(expired)} 条过期分享")
-        except Exception as exc:  # 清理失败不影响主服务
+
+            if deleted:
+                print(f"[cleanup] 已清理 {deleted} 条过期/用尽的分享")
+        except Exception as exc:
             print(f"[cleanup] error: {exc}")
         finally:
             db.close()
