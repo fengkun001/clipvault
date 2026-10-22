@@ -99,6 +99,9 @@ app.add_middleware(RateLimitMiddleware)
 async def security_headers(request: Request, call_next):
     """CSP 等安全响应头：XSS 纵深防御的关键一环"""
     response = await call_next(request)
+    # 页面 HTML 不缓存：部署后浏览器必须立即拿到新模板，避免"改了没生效"的假象
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"

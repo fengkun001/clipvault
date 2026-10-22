@@ -414,9 +414,11 @@ footer a:hover { color: var(--accent); }
 }
 
 /* ============ 标题输入 ============ */
-.title-field { margin-bottom: 14px; }
+.title-field { display: block; width: 100%; margin-bottom: 14px; }
 .title-field input {
+  display: block;
   width: 100%;
+  min-width: 0;
   background: var(--bg-input); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 11px 13px; font-size: 14px; outline: none; font-family: inherit;
