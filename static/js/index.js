@@ -56,14 +56,17 @@ function refreshAuthUI() {
       document.getElementById("loginBtn").hidden = true;
       document.getElementById("logoutBtn").hidden = false;
       renderMyShares();
+      startShareStream();
     }).catch(() => {
       localStorage.removeItem(TOKEN_KEY);
+      stopShareStream();
       renderHistory();
     });
   } else {
     document.getElementById("userBadge").hidden = true;
     document.getElementById("loginBtn").hidden = false;
     document.getElementById("logoutBtn").hidden = true;
+    stopShareStream();
     renderHistory();
   }
 }
@@ -80,6 +83,7 @@ document.getElementById("authModal").addEventListener("click", (e) => {
 });
 document.getElementById("logoutBtn").addEventListener("click", () => {
   localStorage.removeItem(TOKEN_KEY);
+  stopShareStream();
   showToast("已退出登录");
   refreshAuthUI();
 });
@@ -234,6 +238,7 @@ async function createShare() {
     showToast(e.message);
     return;
   }
+  const titleText = document.getElementById("shareTitleInput").value.trim() || null;
   const btn = document.getElementById("shareBtn");
   btn.disabled = true;
   btn.textContent = "创建中…";
@@ -245,11 +250,13 @@ async function createShare() {
       if (!selectedFile) { showToast("请先选择要分享的文件"); return; }
       const fd = new FormData();
       fd.append("file", selectedFile);
+      if (titleText) fd.append("title", titleText);
       if (expires_in !== null) fd.append("expires_in", expires_in);
       if (max_views !== null) fd.append("max_views", max_views);
       data = await uploadWithProgress("/api/files", fd);
       addHistory({
         code: data.code, url: data.url, delete_token: data.delete_token,
+        title: titleText,
         preview: `📎 ${selectedFile.name}`, created_at: new Date().toISOString(),
         expires_at: data.expires_at, max_views: data.max_views,
       });
@@ -265,12 +272,16 @@ async function createShare() {
         // 端到端加密：浏览器内完成，服务器只收到密文
         const enc = await e2eEncrypt(content);
         keyB64 = enc.keyB64;
-        body = { content: enc.payload, content_type: "encrypted", expires_in, max_views };
+        // 标题与正文共用同一把密钥，避免标题以明文落到服务器
+        const titleForServer = titleText
+          ? "enc:" + await e2eEncryptWithKey(titleText, keyB64)
+          : null;
+        body = { content: enc.payload, content_type: "encrypted", title: titleForServer, expires_in, max_views };
         preview = "🔐 [端到端加密内容]";
       } else {
         const typeSel = document.getElementById("contentType").value;
         const content_type = typeSel === "auto" ? detectType(content) : typeSel;
-        body = { content, content_type, expires_in, max_views };
+        body = { content, content_type, title: titleText, expires_in, max_views };
         preview = content.slice(0, 40);
       }
       const res = await authFetch("/api/shares", {
@@ -283,11 +294,13 @@ async function createShare() {
       if (keyB64) data.url = data.url + "#k=" + encodeURIComponent(keyB64);
       addHistory({
         code: data.code, url: data.url, delete_token: data.delete_token,
+        title: titleText,
         preview, created_at: new Date().toISOString(),
         expires_at: data.expires_at, max_views: data.max_views,
       });
       document.getElementById("content").value = "";
     }
+    document.getElementById("shareTitleInput").value = "";
     showResult(data);
     renderAuthedList();
     showToast(keyB64 ? "加密分享已生成（密钥在链接中）" : "分享链接已生成");
@@ -362,8 +375,7 @@ const TYPE_ICON = { text: "📄", markdown: "📝", code: "💻", file: "📎", 
 
 async function renderMyShares() {
   const box = document.getElementById("historyList");
-  document.getElementById("myShareTitle").innerHTML =
-    '🗂️ 我的分享 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">（云端同步 · 含访问统计）</span>';
+  document.getElementById("myShareSub").textContent = "（云端同步 · 含访问统计）";
   box.innerHTML = '<div class="empty-tip">加载中…</div>';
   try {
     const res = await authFetch("/api/auth/my-shares");
@@ -389,9 +401,15 @@ async function renderMyShares() {
         ? '<span class="burned-tag">🔥 已焚毁</span>'
         : "";
 
+      // 加密分享的标题在服务器上是密文（enc: 前缀），云端列表没有密钥，只能提示
+      const showTitle = s.title
+        ? (s.title.startsWith("enc:") ? "🔐 加密标题" : s.title)
+        : "";
+
       return `
         <div class="share-item${burned ? " burned" : ""}">
           <div class="info">
+            ${showTitle ? `<div class="share-title">${escapeHtml(showTitle)}</div>` : ""}
             <a class="code-link" href="/s/${s.code}" target="_blank">${TYPE_ICON[s.content_type] || "📄"} /s/${s.code}</a>
             <span class="desc">${escapeHtml(s.preview || "")} · ${views} · ${exp} ${statusTag}</span>
           </div>
@@ -443,6 +461,7 @@ async function destroyMyShare(code) {
 
 function renderHistory() {
   const box = document.getElementById("historyList");
+  document.getElementById("myShareSub").textContent = "（仅本设备可见）";
   const list = getHistory();
   if (!list.length) {
     box.innerHTML = '<div class="empty-tip">暂无分享记录，创建第一个吧</div>';
@@ -455,6 +474,7 @@ function renderHistory() {
     return `
       <div class="share-item">
         <div class="info">
+          ${item.title ? `<div class="share-title">${escapeHtml(item.title)}</div>` : ""}
           <a class="code-link" href="/s/${item.code}" target="_blank">/s/${item.code}</a>
           <span class="desc">${escapeHtml(item.preview || "")} · 有效期至 ${expText}</span>
         </div>
@@ -471,6 +491,110 @@ async function copyHistoryUrl(code) {
   if (!item) return;
   if (await copyText(item.url)) showToast("链接已复制");
 }
+
+/* ---------- 实时同步（SSE） ----------
+ * 原生 EventSource 无法携带 Authorization 头，所以用 fetch + ReadableStream
+ * 手动解析 SSE 流：既能带 JWT，又保留服务端推送语义，并支持自动重连。
+ */
+let streamCtrl = null;
+let streamEpoch = 0;
+let streamRetry = 0;
+let streamTimer = null;
+let lastSig = null;
+let mySharesTimer = null;
+
+function setSyncBadge(state) {
+  const el = document.getElementById("syncBadge");
+  if (!el) return;
+  if (state === "hidden") { el.hidden = true; return; }
+  el.hidden = false;
+  el.classList.toggle("offline", state !== "on");
+  el.textContent = state === "on" ? "● 实时同步" : "○ 重连中…";
+}
+
+function stopShareStream() {
+  streamEpoch++;
+  if (streamCtrl) { try { streamCtrl.abort(); } catch (e) { /* 已关闭 */ } streamCtrl = null; }
+  if (streamTimer) { clearTimeout(streamTimer); streamTimer = null; }
+  lastSig = null;
+  setSyncBadge("hidden");
+}
+
+function scheduleMySharesRefresh() {
+  clearTimeout(mySharesTimer);
+  mySharesTimer = setTimeout(() => { if (getToken()) renderMyShares(); }, 400);
+}
+
+async function startShareStream() {
+  stopShareStream();
+  const token = getToken();
+  if (!token || !window.fetch || !window.AbortController || !window.TextDecoder) return;
+
+  const epoch = streamEpoch;
+  const ctrl = new AbortController();
+  streamCtrl = ctrl;
+  setSyncBadge("offline");
+
+  try {
+    const res = await fetch("/api/auth/my-shares/stream", {
+      headers: { Authorization: "Bearer " + token },
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    if (epoch !== streamEpoch) return;
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      refreshAuthUI();
+      return;
+    }
+    if (!res.ok || !res.body) throw new Error("stream " + res.status);
+
+    setSyncBadge("on");
+    streamRetry = 0;
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (epoch !== streamEpoch) return;
+      buf += decoder.decode(value, { stream: true });
+
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        // 只取 data: 行；以 ":" 开头的是心跳注释，忽略
+        const data = block.split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.slice(5).trim())
+          .join("");
+        if (!data || data === lastSig) continue;
+        lastSig = data;
+        scheduleMySharesRefresh();
+      }
+    }
+  } catch (e) {
+    if (epoch !== streamEpoch) return;   // 主动停止，不触发重连
+  } finally {
+    if (epoch === streamEpoch) {
+      streamCtrl = null;
+      setSyncBadge("offline");
+    }
+  }
+
+  if (epoch !== streamEpoch || !getToken()) return;
+  streamRetry = Math.min(streamRetry + 1, 5);
+  streamTimer = setTimeout(startShareStream, Math.min(30000, 1000 * Math.pow(2, streamRetry)));
+}
+
+// 从后台切回前台时立即校准一次，并确保连接仍然存在
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !getToken()) return;
+  renderMyShares();
+  if (!streamCtrl) startShareStream();
+});
 
 /* ---------- 事件绑定 ---------- */
 document.getElementById("shareBtn").addEventListener("click", createShare);

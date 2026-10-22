@@ -51,6 +51,7 @@ def create_share(
         user_id=user.id if user else None,
         content=payload.content,
         content_type=payload.content_type,
+        title=(payload.title or "").strip() or None,
         expires_at=expires_at,
         max_views=payload.max_views,
         delete_token=generate_token(),
@@ -66,6 +67,7 @@ def create_share(
         delete_token=share.delete_token,
         expires_at=expires_at,
         max_views=payload.max_views,
+        title=share.title,
     )
 
 
@@ -84,6 +86,7 @@ def get_share_meta(code: str, db: Session = Depends(get_db)):
     return schemas.ShareMeta(
         code=share.code,
         content_type=share.content_type,
+        title=share.title,
         file_name=share.file_name,
         file_size=share.file_size,
         file_mime=share.file_mime,
@@ -138,6 +141,7 @@ def get_share_content(code: str, db: Session = Depends(get_db)):
         code=share.code,
         content_type=share.content_type,
         content=content,
+        title=share.title,
         created_at=share.created_at,
         expires_at=share.expires_at,
         view_count=new_count,

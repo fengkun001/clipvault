@@ -81,6 +81,8 @@ def _migrate(engine) -> None:
     with engine.begin() as conn:
         if "user_id" not in columns:
             conn.execute(text("ALTER TABLE shares ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+        if "title" not in columns:
+            conn.execute(text("ALTER TABLE shares ADD COLUMN title VARCHAR(2000)"))
 
 
 app = FastAPI(

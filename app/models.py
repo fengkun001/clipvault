@@ -26,6 +26,7 @@ class Share(Base):
     file_name = Column(String(255), nullable=True) # 原始文件名（展示用）
     file_size = Column(Integer, nullable=True)
     file_mime = Column(String(100), nullable=True)
+    title = Column(String(2000), nullable=True)       # 可选标题/描述；端到端加密分享存 "enc:" 前缀的密文
     delete_token = Column(String(64), nullable=True)  # 创建者凭此令牌删除分享
     expires_at = Column(DateTime, nullable=True)   # NULL 表示永久有效
     max_views = Column(Integer, nullable=True)    # NULL 表示不限次数

@@ -6,6 +6,7 @@
   <meta name="description" content="ClipVault - 轻量级云剪切板分享系统，支持有效期、访问次数限制、阅后即焚">
   <title>ClipVault · 云剪切板分享</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <script src="/static/js/theme-init.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -16,6 +17,7 @@
         <span class="name">ClipVault</span>
       </a>
       <div class="nav-right">
+        <button class="btn btn-ghost theme-toggle" id="themeToggle" title="切换夜间/日间模式" aria-label="切换主题">🌙</button>
         <span class="tag" id="userBadge" hidden>👤 <b id="userName"></b></span>
         <button class="btn btn-ghost" id="loginBtn">登录 / 注册</button>
         <button class="btn btn-ghost" id="logoutBtn" hidden>退出</button>
@@ -32,6 +34,10 @@
       <div class="tabs">
         <button class="tab active" data-tab="text">📝 文本</button>
         <button class="tab" data-tab="file">📎 文件</button>
+      </div>
+
+      <div class="title-field">
+        <input id="shareTitleInput" maxlength="200" placeholder="标题 / 描述（选填）—— 方便日后在列表中一眼认出这条内容">
       </div>
 
       <div id="textTab">
@@ -136,7 +142,11 @@
 
     <!-- 我的分享 -->
     <section>
-      <div class="section-title" id="myShareTitle">🗂️ 我的分享 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">（仅本设备可见）</span></div>
+      <div class="section-title" id="myShareTitle">
+        <span>🗂️ 我的分享</span>
+        <span class="section-sub" id="myShareSub">（仅本设备可见）</span>
+        <span class="sync-badge" id="syncBadge" hidden>● 实时同步</span>
+      </div>
       <div class="card" id="historyCard">
         <div id="historyList"></div>
       </div>
@@ -174,6 +184,7 @@
   <script src="/static/lib/qrcode.min.js"></script>
   <script src="/static/lib/e2e-fallback.js"></script>
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/theme.js"></script>
   <script src="/static/js/index.js"></script>
 </body>
 </html>

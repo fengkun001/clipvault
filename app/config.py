@@ -15,6 +15,7 @@ class Settings:
     CODE_LENGTH = 8                          # 短码长度，Base62 下 62^8 种组合
     BASE_URL = os.environ.get("BASE_URL", "")  # 部署时通过环境变量注入，如 http://1.2.3.4
     CLEANUP_INTERVAL = 300                    # 过期内容自动清理间隔（秒）
+    SSE_POLL_INTERVAL = 2                     # 实时同步：服务端查询变化的间隔（秒）
 
 
 settings = Settings()

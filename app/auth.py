@@ -87,3 +87,26 @@ def require_user(user: User | None = Depends(get_current_user)) -> User:
     if user is None:
         raise HTTPException(status_code=401, detail="请先登录")
     return user
+
+
+def get_token_user_id(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> int | None:
+    """只解析 JWT 中的用户 ID，不查数据库。
+
+    用于 SSE 这类长连接：若沿用 get_current_user，数据库会话会一直持有到连接结束，
+    SQLite 的读事务可能长时间占用，导致其他 worker 写入被阻塞。
+    """
+    if creds is None:
+        return None
+    try:
+        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        return None
+
+
+def require_token_user_id(user_id: int | None = Depends(get_token_user_id)) -> int:
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return user_id

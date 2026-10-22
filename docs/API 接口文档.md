@@ -59,13 +59,14 @@ POST /api/shares
 | content_type | string | 否 | `text`（默认）/ `markdown` / `code` / `encrypted` |
 | expires_in | int | 否 | 有效期（秒），1～31536000（365天），不传则永久 |
 | max_views | int | 否 | 最大访问次数，1～100000，不传则不限 |
+| title | string | 否 | 标题/描述，最长 2000 字符；端到端加密分享会以 `enc:` 前缀存密文 |
 
 **请求示例：**
 
 ```bash
 curl -X POST http://39.107.52.250/api/shares \
   -H "Content-Type: application/json" \
-  -d '{"content": "Hello World", "content_type": "text", "expires_in": 3600, "max_views": 5}'
+  -d '{"content": "Hello World", "content_type": "text", "title": "今天的会议纪要", "expires_in": 3600, "max_views": 5}'
 ```
 
 **响应示例（200）：**
@@ -76,7 +77,8 @@ curl -X POST http://39.107.52.250/api/shares \
   "url": "http://39.107.52.250/s/aB3xK9mZ",
   "delete_token": "abc123...",
   "expires_at": "2026-09-07T15:00:00",
-  "max_views": 5
+  "max_views": 5,
+  "title": "今天的会议纪要"
 }
 ```
 
@@ -185,12 +187,14 @@ POST /api/files
 | file | file | 是 | 文件，最大 100MB |
 | expires_in | int | 否 | 有效期（秒），1～31536000 |
 | max_views | int | 否 | 最大访问次数，1～100000 |
+| title | string | 否 | 标题/描述，最长 2000 字符 |
 
 **请求示例：**
 
 ```bash
 curl -X POST http://39.107.52.250/api/files \
   -F "file=@photo.jpg" \
+  -F "title=项目截图" \
   -F "expires_in=86400" \
   -F "max_views=10"
 ```
@@ -319,6 +323,7 @@ Authorization: Bearer <token>
     "url": "http://39.107.52.250/s/aB3xK9mZ",
     "content_type": "text",
     "preview": "Hello World",
+    "title": "今天的会议纪要",
     "file_name": null,
     "file_size": null,
     "created_at": "2026-09-07T14:00:00",
@@ -330,6 +335,34 @@ Authorization: Bearer <token>
 ```
 
 > 返回最近 50 条分享，按创建时间倒序。
+
+### 4.5 实时同步推送（SSE）
+
+```
+GET /api/auth/my-shares/stream
+Authorization: Bearer <token>
+```
+
+> 长连接推送。服务端每 2 秒比对一次该用户分享的聚合签名
+> `(记录数, 最大 id, 访问次数总和)`，发生变化时推送一条 `data:` 事件；
+> 长时间无变化时每 15 秒发一次 `: ping` 心跳注释行。
+
+**响应示例（`text/event-stream`）：**
+
+```
+data: 3-42-17
+
+: ping
+```
+
+**说明：**
+
+| 项 | 说明 |
+|----|------|
+| 事件内容 | 聚合签名字符串，客户端只需判断是否变化，变化后重新拉取 `/api/auth/my-shares` |
+| 多 worker | 不使用进程内广播，任意 worker 处理任意连接都能读到一致结果 |
+| Nginx | 需要关闭 `proxy_buffering`，并放宽 `proxy_read_timeout`，仓库 `deploy/nginx.conf` 已配置 |
+| 客户端 | 原生 `EventSource` 无法携带 `Authorization` 头，前端使用 `fetch` + `ReadableStream` 手动解析 |
 
 ---
 

@@ -119,6 +119,26 @@ async function e2eEncrypt(plaintext) {
   throw new Error("当前环境不支持加密");
 }
 
+async function e2eEncryptWithKey(plaintext, keyB64) {
+  // 用已有密钥加密（让标题与正文共用同一把密钥，标题同样不以明文落到服务器）
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const key = await crypto.subtle.importKey(
+      "raw", base64ToBytes(keyB64), { name: "AES-GCM" }, false, ["encrypt"]
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext)
+    );
+    return bytesToBase64(iv) + "." + bytesToBase64(new Uint8Array(ct));
+  }
+
+  if (typeof E2E_FALLBACK !== "undefined") {
+    return await E2E_FALLBACK.encryptWithKey(plaintext, keyB64);
+  }
+
+  throw new Error("当前环境不支持加密");
+}
+
 async function e2eDecrypt(payload, keyB64) {
   const parts = payload.split(".");
 

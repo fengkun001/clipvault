@@ -36,12 +36,31 @@ function showBurned(status) {
 
 const TYPE_LABEL = { text: "📄 纯文本", markdown: "📝 Markdown", code: "💻 代码", file: "📦 文件" };
 
+/* ---------- 标题（可选） ---------- */
+async function applyTitle(rawTitle, keyB64) {
+  const el = document.getElementById("viewTitle");
+  if (!rawTitle) { el.hidden = true; return; }
+  let title = rawTitle;
+  if (title.startsWith("enc:")) {
+    if (!keyB64) {
+      title = "🔐 加密标题";
+    } else {
+      try { title = await e2eDecrypt(title.slice(4), keyB64); }
+      catch (e) { title = "🔐 加密标题"; }
+    }
+  }
+  el.textContent = title;            // textContent 天然防 XSS
+  el.hidden = false;
+  document.title = title + " · ClipVault";
+}
+
 /* ---------- 文本类渲染 ---------- */
 async function render(data) {
   document.getElementById("loadingBox").hidden = true;
   document.getElementById("contentBox").hidden = false;
 
   let content = data.content;
+  let keyB64 = null;
   let typeBadgeText = TYPE_LABEL[data.content_type] || "文本";
 
   /* 端到端加密内容：从 URL 锚点取密钥，浏览器内解密 */
@@ -58,8 +77,9 @@ async function render(data) {
       showToast("当前浏览器不支持解密（请使用 HTTPS 或现代浏览器打开）");
       return;
     }
+    keyB64 = decodeURIComponent(km[1]);
     try {
-      content = await e2eDecrypt(data.content, decodeURIComponent(km[1]));
+      content = await e2eDecrypt(data.content, keyB64);
       const innerType = detectType(content);
       typeBadgeText = "🔐 已解密 · " + (TYPE_LABEL[innerType] || "文本");
       data.content_type = innerType;
@@ -68,6 +88,8 @@ async function render(data) {
       return;
     }
   }
+
+  await applyTitle(data.title, keyB64);
 
   document.getElementById("typeBadge").textContent = typeBadgeText;
   updateViewsBadge(document.getElementById("viewsBadge"), data.view_count, data.max_views);
@@ -106,6 +128,8 @@ function renderFile(meta) {
   document.getElementById("loadingBox").hidden = true;
   const box = document.getElementById("fileBox");
   box.hidden = false;
+
+  applyTitle(meta.title, null);
 
   const ext = (meta.file_name || "").split(".").pop().toLowerCase();
   const icon = document.getElementById("fileIcon");

@@ -341,6 +341,15 @@ const E2E_FALLBACK = (() => {
     };
   }
 
+  async function encryptWithKey(plaintext, keyB64) {
+    // 用已有密钥加密（例如让标题与正文共用同一把密钥，避免标题明文泄露）
+    const key = b64ToBytes(keyB64);
+    const iv = randBytes(16);
+    const ct = aesCbcEncrypt(new TextEncoder().encode(plaintext), key, iv);
+    const mac = hmacSha256(key, ct);
+    return bytesToB64(iv) + "." + bytesToB64(ct) + "." + bytesToB64(mac);
+  }
+
   async function decrypt(payload, keyB64) {
     const parts = payload.split(".");
     if (parts.length !== 3) throw new Error("bad payload format");
@@ -359,5 +368,5 @@ const E2E_FALLBACK = (() => {
     return new TextDecoder().decode(pt);
   }
 
-  return { encrypt, decrypt, randBytes, bytesToB64, b64ToBytes };
+  return { encrypt, encryptWithKey, decrypt, randBytes, bytesToB64, b64ToBytes };
 })();

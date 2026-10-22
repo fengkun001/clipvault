@@ -54,6 +54,7 @@ async def upload_file(
     file: UploadFile = File(...),
     expires_in: int | None = Form(None),
     max_views: int | None = Form(None),
+    title: str | None = Form(None),
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
@@ -104,6 +105,7 @@ async def upload_file(
         code=code,
         user_id=user.id if user else None,
         content_type="file",
+        title=(title or "").strip()[:2000] or None,
         file_path=str(store_path),
         file_name=_sanitize_filename(file.filename),
         file_size=size,
@@ -123,6 +125,7 @@ async def upload_file(
         delete_token=share.delete_token,
         expires_at=expires_at,
         max_views=max_views,
+        title=share.title,
     )
 
 

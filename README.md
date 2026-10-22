@@ -15,6 +15,9 @@
 - **完全匿名**：无需注册即可使用，数据库不存 IP、不存身份，只有内容与时间
 - **跨设备响应式**：同一页面自适应手机 / 平板 / 电脑浏览器
 - **手动销毁**：创建者持有销毁令牌（仅存于本设备），可随时一键焚毁
+- **可选标题 / 描述**：创建分享时可填一句标题，列表里一眼认出内容，不用逐个点开；加密分享的标题会与正文共用密钥一并加密
+- **日间 / 夜间主题**：一键切换并记住选择，首屏由 `theme-init.js` 提前同步执行，无白屏闪烁
+- **多设备实时同步**：登录后同一账号在其他设备的增删、访问次数变化会自动刷新列表（SSE 推送），无需手动刷新
 
 ### 创新点
 | 创新点 | 说明 |
@@ -26,6 +29,8 @@
 | 👤 **可选账号系统** | 注册 / 登录（JWT）后可在云端管理分享、查看访问统计；匿名使用完全不受影响 |
 | 🛡️ **滑动窗口限流** | 创建 30次/10分、上传 20次/10分、读取 120次/分，纯内存实现，零外部依赖 |
 | 📤 **上传进度条** | XHR 驱动的实时上传进度，大文件可视化反馈 |
+| 📡 **SSE 实时同步** | 每 2 秒比对数据库聚合签名 `(COUNT, MAX(id), SUM(view_count))`，多 worker 部署下同样有效；Nginx 侧关闭缓冲、长连接不超时 |
+| 🎨 **无闪烁主题** | CSS 变量 + `html[data-theme]`，初始化脚本在样式表之前同步执行，深/浅色首屏都不闪 |
 
 ### 安全设计
 - **短码防猜测**：`secrets` 密码学安全随机生成 Base62 短码，8 位达 62⁸ ≈ 2.2×10¹⁴ 种组合
@@ -110,14 +115,15 @@ cd /tmp/clipvault && sudo bash deploy/deploy.sh
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/shares` | 创建文本分享（内容/类型/有效期/次数） |
+| POST | `/api/shares` | 创建文本分享（内容/类型/有效期/次数/可选标题） |
 | GET | `/api/shares/{code}` | 获取内容（消耗一次访问，原子计数） |
 | GET | `/api/shares/{code}/meta` | 元信息（不消耗次数） |
 | DELETE | `/api/shares/{code}?token=` | 凭销毁令牌焚毁（登录态亦可） |
-| POST | `/api/files` | 上传文件分享（multipart，≤100MB） |
+| POST | `/api/files` | 上传文件分享（multipart，≤100MB，可带 title） |
 | GET | `/api/files/{code}/download` | 下载文件（消耗次数） |
 | POST | `/api/auth/register` / `login` | 注册 / 登录（返回 JWT） |
-| GET | `/api/auth/my-shares` | 我的分享列表（含访问统计） |
+| GET | `/api/auth/my-shares` | 我的分享列表（含访问统计与标题） |
+| GET | `/api/auth/my-shares/stream` | SSE 实时推送列表变化（需登录） |
 
 ## 📁 项目结构
 
@@ -138,11 +144,13 @@ clipvault/
 │       ├── files.py     # 文件上传下载 API
 │       └── auth.py      # 用户注册登录 API
 ├── static/
-│   ├── css/style.css    # 深色主题、响应式布局
+│   ├── css/style.css    # 深/浅双主题变量、响应式布局
 │   ├── js/
-│   │   ├── common.js    # 加密/解密、历史存储、authFetch
-│   │   ├── index.js     # 主页：创建分享、历史列表、焚毁
-│   │   └── view.js      # 查看页：解密渲染
+│   │   ├── theme-init.js # 首屏前同步设置主题，避免闪烁
+│   │   ├── theme.js      # 主题切换按钮与持久化
+│   │   ├── common.js     # 加密/解密、历史存储、authFetch
+│   │   ├── index.js      # 主页：创建分享、历史列表、焚毁、SSE 同步
+│   │   └── view.js       # 查看页：解密渲染、标题展示
 │   └── lib/             # 自托管第三方库（零 CDN 依赖）
 │       ├── e2e-fallback.js  # 纯 JS AES-256-CBC（HTTP 环境加密降级）
 │       ├── qrcode.min.js    # 二维码生成

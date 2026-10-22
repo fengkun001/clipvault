@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>分享内容 · ClipVault</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <script src="/static/js/theme-init.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/lib/highlight-theme.css">
 </head>
@@ -15,8 +16,13 @@
         <span class="logo">📋</span>
         <span class="name">ClipVault</span>
       </a>
-      <span class="tag" id="codeTag">…</span>
+      <div class="nav-right">
+        <button class="btn btn-ghost theme-toggle" id="themeToggle" title="切换夜间/日间模式" aria-label="切换主题">🌙</button>
+        <span class="tag" id="codeTag">…</span>
+      </div>
     </nav>
+
+    <h2 class="view-title" id="viewTitle" hidden></h2>
 
     <!-- 加载中 -->
     <div class="card loading" id="loadingBox">
@@ -80,6 +86,7 @@
   <script src="/static/lib/highlight.min.js"></script>
   <script src="/static/lib/e2e-fallback.js"></script>
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/theme.js"></script>
   <script src="/static/js/view.js"></script>
 </body>
 </html>
