@@ -15,8 +15,8 @@
 
   function apply(theme, persist) {
     document.documentElement.dataset.theme = theme;
-    // 内联声明优先级最高，明确告诉浏览器当前页面支持哪种配色，避免被"强制深色"反色
-    document.documentElement.style.colorScheme = theme;
+    // only light / only dark：禁止浏览器强制深色（Auto Dark / 夜间模式）反色
+    document.documentElement.style.colorScheme = theme === "light" ? "only light" : "only dark";
     renderButton(theme);
     if (persist) {
       try { localStorage.setItem(KEY, theme); } catch (e) { /* 隐私模式下忽略 */ }
