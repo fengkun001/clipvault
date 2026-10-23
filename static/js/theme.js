@@ -25,7 +25,13 @@
   apply(current(), false);
 
   if (btn) {
-    btn.addEventListener("click", function () {
+    var lastToggle = 0;
+    btn.addEventListener("click", function (e) {
+      // 部分手机浏览器会连发两次 click（触摸合成），用时间窗挡住第二次，避免"闪一下又回去"
+      var now = Date.now();
+      if (now - lastToggle < 350) return;
+      lastToggle = now;
+      if (e && e.preventDefault) e.preventDefault();
       apply(current() === "light" ? "dark" : "light", true);
     });
   }
