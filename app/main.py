@@ -102,6 +102,10 @@ async def security_headers(request: Request, call_next):
     # 页面 HTML 不缓存：部署后浏览器必须立即拿到新模板，避免"改了没生效"的假象
     if response.headers.get("content-type", "").startswith("text/html"):
         response.headers["Cache-Control"] = "no-store"
+    # 自研 JS/CSS 也强制回源校验：手机浏览器对静态资源的启发式缓存很顽固
+    path = request.url.path
+    if path.startswith("/static/js/") or path.startswith("/static/css/"):
+        response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"

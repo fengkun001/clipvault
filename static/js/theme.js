@@ -15,6 +15,8 @@
 
   function apply(theme, persist) {
     document.documentElement.dataset.theme = theme;
+    // 内联声明优先级最高，明确告诉浏览器当前页面支持哪种配色，避免被"强制深色"反色
+    document.documentElement.style.colorScheme = theme;
     renderButton(theme);
     if (persist) {
       try { localStorage.setItem(KEY, theme); } catch (e) { /* 隐私模式下忽略 */ }
@@ -25,14 +27,34 @@
   apply(current(), false);
 
   if (btn) {
-    var lastToggle = 0;
-    btn.addEventListener("click", function (e) {
-      // 部分手机浏览器会连发两次 click（触摸合成），用时间窗挡住第二次，避免"闪一下又回去"
-      var now = Date.now();
-      if (now - lastToggle < 350) return;
-      lastToggle = now;
-      if (e && e.preventDefault) e.preventDefault();
+    var locked = false;
+
+    function toggle() {
+      if (locked) return;
+      locked = true;
+      setTimeout(function () { locked = false; }, 500);
       apply(current() === "light" ? "dark" : "light", true);
-    });
+    }
+
+    if (window.PointerEvent) {
+      // 手机端一次触摸只会产生一个 pointerup，彻底避开浏览器合成的重复 click
+      btn.addEventListener("pointerup", function (e) {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        e.preventDefault();
+        toggle();
+      });
+      // 鼠标/触摸的 click 不再重复处理；仅保留键盘（Enter/Space，detail 为 0）可访问性
+      btn.addEventListener("click", function (e) {
+        if (e.detail === 0) {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    } else {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        toggle();
+      });
+    }
   }
 })();
